@@ -4,9 +4,9 @@ add_library(index_core STATIC
     InvertedIndex.cpp
 )
 
-target_link_libraries(index_lib PRIVATE project_warnings)
+target_link_libraries(index_core PRIVATE project_warnings)
 if (TARGET project_sanitizers)
-    target_link_libraries(index_lib PRIVATE project_sanitizers)
+    target_link_libraries(index_core PRIVATE project_sanitizers)
 endif()
 
 target_include_directories(index_core
