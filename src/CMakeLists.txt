@@ -1,7 +1,7 @@
 add_library(index_core STATIC
-    Document.cpp
-    DocumentBuilder.cpp
-    InvertedIndex.cpp
+    index_core/Document.cpp
+    index_core/DocumentBuilder.cpp
+    index_core/InvertedIndex.cpp
 )
 
 target_link_libraries(index_core PRIVATE project_warnings)
