@@ -1,6 +1,5 @@
 #include "DocumentBuilder.hpp"
 #include <algorithm>
-#include <cctype>
 
 static bool isDelimiter(char c)
 {
@@ -16,7 +15,6 @@ std::vector<std::string_view> DocumentBuilder::splitWords(std::string_view text)
 
     while (start < text.size())
     {
-        // Пропускаем разделители
         while (start < text.size() && isDelimiter(text[start]))
         {
             ++start;
@@ -25,13 +23,11 @@ std::vector<std::string_view> DocumentBuilder::splitWords(std::string_view text)
             break;
 
         size_t end = start;
-        // Идём до следующего разделителя
         while (end < text.size() && !isDelimiter(text[end]))
-        { // ← ИСПРАВЛЕНО!
+        {
             ++end;
         }
 
-        // Добавляем слово
         words.emplace_back(text.substr(start, end - start));
         start = end;
     }

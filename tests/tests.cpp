@@ -69,7 +69,7 @@ TEST_CASE("DocumentBuilder: splitWords разбивает текст на сло
         CHECK(words[2] == "test");
     }
 
-    SECTION("Несколько пробелов между словами")
+    SECTION("Несколько пробелов между ловами")
     {
         string text = "hello    world     index";
         auto words = DocumentBuilder::splitWords(text);
