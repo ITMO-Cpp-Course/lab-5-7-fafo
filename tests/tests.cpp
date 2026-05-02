@@ -1,12 +1,11 @@
-#include <catch2/catch_all.hpp>
-#include "InvertedIndex.hpp"
 #include "DocumentBuilder.hpp"
+#include "InvertedIndex.hpp"
+#include <catch2/catch_all.hpp>
 
 using namespace std;
 
-
-
-TEST_CASE("Document: конструктор и геттеры", "[Document]") {
+TEST_CASE("Document: конструктор и геттеры", "[Document]")
+{
     Document doc(42, "test.txt", "some content");
 
     REQUIRE(doc.id() == 42);
@@ -14,7 +13,8 @@ TEST_CASE("Document: конструктор и геттеры", "[Document]") {
     REQUIRE(doc.text() == "some content");
 }
 
-TEST_CASE("Document: конструктор по умолчанию", "[Document]") {
+TEST_CASE("Document: конструктор по умолчанию", "[Document]")
+{
     Document doc;
 
     REQUIRE(doc.id() == 0);
@@ -22,17 +22,18 @@ TEST_CASE("Document: конструктор по умолчанию", "[Document
     REQUIRE(doc.text().empty());
 }
 
-
-
-TEST_CASE("DocumentBuilder: build создаёт документ", "[DocumentBuilder]") {
+TEST_CASE("DocumentBuilder: build создаёт документ", "[DocumentBuilder]")
+{
     Document doc = DocumentBuilder::build("myfile.txt", "Hello world");
 
     CHECK(doc.name() == "myfile.txt");
     CHECK(doc.text() == "Hello world");
 }
 
-TEST_CASE("DocumentBuilder: splitWords разбивает текст на слова", "[DocumentBuilder]") {
-    SECTION("Обычный текст с пробелами") {
+TEST_CASE("DocumentBuilder: splitWords разбивает текст на слова", "[DocumentBuilder]")
+{
+    SECTION("Обычный текст с пробелами")
+    {
         string text = "hello world from index";
         auto words = DocumentBuilder::splitWords(text);
 
@@ -43,7 +44,8 @@ TEST_CASE("DocumentBuilder: splitWords разбивает текст на сло
         CHECK(words[3] == "index");
     }
 
-    SECTION("Текст с запятыми и точками") {
+    SECTION("Текст с запятыми и точками")
+    {
         string text = "Hello, world! This is a test.";
         auto words = DocumentBuilder::splitWords(text);
 
@@ -56,7 +58,8 @@ TEST_CASE("DocumentBuilder: splitWords разбивает текст на сло
         CHECK(words[5] == "test");
     }
 
-    SECTION("Текст со скобками и кавычками") {
+    SECTION("Текст со скобками и кавычками")
+    {
         string text = "(Hello) 'world' [test]";
         auto words = DocumentBuilder::splitWords(text);
 
@@ -66,7 +69,8 @@ TEST_CASE("DocumentBuilder: splitWords разбивает текст на сло
         CHECK(words[2] == "test");
     }
 
-    SECTION("Несколько пробелов между словами") {
+    SECTION("Несколько пробелов между словами")
+    {
         string text = "hello    world     index";
         auto words = DocumentBuilder::splitWords(text);
 
@@ -76,19 +80,22 @@ TEST_CASE("DocumentBuilder: splitWords разбивает текст на сло
         CHECK(words[2] == "index");
     }
 
-    SECTION("Пустая строка") {
+    SECTION("Пустая строка")
+    {
         string text = "";
         auto words = DocumentBuilder::splitWords(text);
         REQUIRE(words.empty());
     }
 
-    SECTION("Только разделители") {
+    SECTION("Только разделители")
+    {
         string text = "   \n\t ,.!?;:() [] {} ";
         auto words = DocumentBuilder::splitWords(text);
         REQUIRE(words.empty());
     }
 
-    SECTION("Слова с дефисами (дефис - разделитель)") {
+    SECTION("Слова с дефисами (дефис - разделитель)")
+    {
         string text = "hello-world test";
         auto words = DocumentBuilder::splitWords(text);
 
@@ -100,59 +107,68 @@ TEST_CASE("DocumentBuilder: splitWords разбивает текст на сло
     }
 }
 
-TEST_CASE("DocumentBuilder: toLower приводит к нижнему регистру", "[DocumentBuilder]") {
-    SECTION("Английские буквы") {
+TEST_CASE("DocumentBuilder: toLower приводит к нижнему регистру", "[DocumentBuilder]")
+{
+    SECTION("Английские буквы")
+    {
         string word = "HelloWorld";
         DocumentBuilder::toLower(word);
         CHECK(word == "helloworld");
     }
 
-    SECTION("Смешанный регистр") {
+    SECTION("Смешанный регистр")
+    {
         string word = "HeLlO WoRlD";
         DocumentBuilder::toLower(word);
         CHECK(word == "hello world");
     }
 
-    SECTION("Уже нижний регистр") {
+    SECTION("Уже нижний регистр")
+    {
         string word = "hello";
         DocumentBuilder::toLower(word);
         CHECK(word == "hello");
     }
 
-    SECTION("Цифры и знаки не меняются") {
+    SECTION("Цифры и знаки не меняются")
+    {
         string word = "Hello123!";
         DocumentBuilder::toLower(word);
         CHECK(word == "hello123!");
     }
 }
 
-
-TEST_CASE("InvertedIndex: добавление одного документа", "[InvertedIndex]") {
+TEST_CASE("InvertedIndex: добавление одного документа", "[InvertedIndex]")
+{
     InvertedIndex index;
     Document doc(1, "doc1.txt", "hello world");
     index.addDocument(std::move(doc));
 
-    SECTION("Поиск существующего слова") {
+    SECTION("Поиск существующего слова")
+    {
         auto result = index.search("hello");
         REQUIRE(result.size() == 1);
         CHECK(result[0].first == 1);
         CHECK(result[0].second == 1);
     }
 
-    SECTION("Поиск другого существующего слова") {
+    SECTION("Поиск другого существующего слова")
+    {
         auto result = index.search("world");
         REQUIRE(result.size() == 1);
         CHECK(result[0].first == 1);
         CHECK(result[0].second == 1);
     }
 
-    SECTION("Поиск несуществующего слова") {
+    SECTION("Поиск несуществующего слова")
+    {
         auto result = index.search("nonexistent");
         REQUIRE(result.empty());
     }
 }
 
-TEST_CASE("InvertedIndex: подсчёт частоты слов", "[InvertedIndex]") {
+TEST_CASE("InvertedIndex: подсчёт частоты слов", "[InvertedIndex]")
+{
     InvertedIndex index;
     Document doc(1, "doc1.txt", "hello hello world hello");
     index.addDocument(std::move(doc));
@@ -166,7 +182,8 @@ TEST_CASE("InvertedIndex: подсчёт частоты слов", "[InvertedInd
     CHECK(result2[0].second == 1);
 }
 
-TEST_CASE("InvertedIndex: несколько документов", "[InvertedIndex]") {
+TEST_CASE("InvertedIndex: несколько документов", "[InvertedIndex]")
+{
     InvertedIndex index;
 
     Document doc1(1, "file1.txt", "hello world");
@@ -177,45 +194,59 @@ TEST_CASE("InvertedIndex: несколько документов", "[InvertedIn
     index.addDocument(std::move(doc2));
     index.addDocument(std::move(doc3));
 
-    SECTION("Поиск 'hello' - в 2 документах") {
+    SECTION("Поиск 'hello' - в 2 документах")
+    {
         auto result = index.search("hello");
         REQUIRE(result.size() == 2);
 
         bool hasDoc1 = false, hasDoc2 = false;
-        for (const auto& [id, count] : result) {
-            if (id == 1) { hasDoc1 = true; CHECK(count == 1); }
-            if (id == 2) { hasDoc2 = true; CHECK(count == 1); }
+        for (const auto& [id, count] : result)
+        {
+            if (id == 1)
+            {
+                hasDoc1 = true;
+                CHECK(count == 1);
+            }
+            if (id == 2)
+            {
+                hasDoc2 = true;
+                CHECK(count == 1);
+            }
         }
         CHECK(hasDoc1);
         CHECK(hasDoc2);
     }
 
-    SECTION("Поиск 'world' - в 2 документах (1 и 3)") {
+    SECTION("Поиск 'world' - в 2 документах (1 и 3)")
+    {
         auto result = index.search("world");
         REQUIRE(result.size() == 2);
     }
 
-    SECTION("Поиск 'index' - в 2 документах (2 и 3)") {
+    SECTION("Поиск 'index' - в 2 документах (2 и 3)")
+    {
         auto result = index.search("index");
         REQUIRE(result.size() == 2);
     }
 }
 
-TEST_CASE("InvertedIndex: регистронезависимость", "[InvertedIndex]") {
+TEST_CASE("InvertedIndex: регистронезависимость", "[InvertedIndex]")
+{
     InvertedIndex index;
     Document doc(1, "doc.txt", "Hello WORLD hello");
     index.addDocument(std::move(doc));
 
     auto result1 = index.search("hello");
     REQUIRE(result1.size() == 1);
-    CHECK(result1[0].second == 2);  // Hello и hello
+    CHECK(result1[0].second == 2); // Hello и hello
 
     auto result2 = index.search("WORLD");
     REQUIRE(result2.size() == 1);
     CHECK(result2[0].second == 1);
 }
 
-TEST_CASE("InvertedIndex: удаление документа", "[InvertedIndex]") {
+TEST_CASE("InvertedIndex: удаление документа", "[InvertedIndex]")
+{
     InvertedIndex index;
 
     Document doc1(1, "file1.txt", "hello world");
@@ -234,37 +265,42 @@ TEST_CASE("InvertedIndex: удаление документа", "[InvertedIndex]
     CHECK(index.search("world").empty());
 }
 
-TEST_CASE("InvertedIndex: удаление несуществующего документа", "[InvertedIndex]") {
+TEST_CASE("InvertedIndex: удаление несуществующего документа", "[InvertedIndex]")
+{
     InvertedIndex index;
     Document doc(1, "doc.txt", "hello world");
     index.addDocument(std::move(doc));
 
-    index.removeDocument(999);  // не существует
+    index.removeDocument(999); // не существует
 
     auto result = index.search("hello");
     REQUIRE(result.size() == 1);
     CHECK(result[0].first == 1);
 }
 
-TEST_CASE("InvertedIndex: getDocument возвращает документ", "[InvertedIndex]") {
+TEST_CASE("InvertedIndex: getDocument возвращает документ", "[InvertedIndex]")
+{
     InvertedIndex index;
     Document doc(42, "mydoc.txt", "some content");
     index.addDocument(std::move(doc));
 
-    SECTION("Существующий документ") {
+    SECTION("Существующий документ")
+    {
         const Document* retrieved = index.getDocument(42);
         REQUIRE(retrieved != nullptr);
         CHECK(retrieved->name() == "mydoc.txt");
         CHECK(retrieved->text() == "some content");
     }
 
-    SECTION("Несуществующий документ") {
+    SECTION("Несуществующий документ")
+    {
         const Document* retrieved = index.getDocument(999);
         CHECK(retrieved == nullptr);
     }
 }
 
-TEST_CASE("InvertedIndex: замена документа с тем же ID", "[InvertedIndex]") {
+TEST_CASE("InvertedIndex: замена документа с тем же ID", "[InvertedIndex]")
+{
     InvertedIndex index;
 
     Document doc1(1, "first.txt", "hello world");
@@ -293,7 +329,8 @@ TEST_CASE("InvertedIndex: замена документа с тем же ID", "[
     CHECK(doc->name() == "second.txt");
 }
 
-TEST_CASE("InvertedIndex: пустой документ", "[InvertedIndex]") {
+TEST_CASE("InvertedIndex: пустой документ", "[InvertedIndex]")
+{
     InvertedIndex index;
     Document doc(1, "empty.txt", "");
     index.addDocument(std::move(doc));
@@ -302,7 +339,8 @@ TEST_CASE("InvertedIndex: пустой документ", "[InvertedIndex]") {
     CHECK(index.getDocument(1) != nullptr);
 }
 
-TEST_CASE("InvertedIndex: перекрестные проверки", "[InvertedIndex]") {
+TEST_CASE("InvertedIndex: перекрестные проверки", "[InvertedIndex]")
+{
     InvertedIndex index;
 
     Document doc1(1, "doc1.txt", "cat dog fish");
