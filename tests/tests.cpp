@@ -1,332 +1,280 @@
 #include "DocumentBuilder.hpp"
-#include "InvertedIndex.hpp"
+#include "IndexStore.hpp"
 #include <catch2/catch_all.hpp>
 
 using namespace std;
 
-TEST_CASE("Document: конструктор и геттеры", "[Document]")
+TEST_CASE("IndexStore: addDocument успешно добавляет документ", "[IndexStore]")
 {
-    Document doc(42, "test.txt", "some content");
+    IndexStore store;
+    Document doc(1, "test.txt", "hello world");
 
-    REQUIRE(doc.id() == 42);
-    REQUIRE(doc.name() == "test.txt");
-    REQUIRE(doc.text() == "some content");
+    auto result = store.addDocument(std::move(doc));
+    REQUIRE(result.has_value());
+
+    const Document* retrieved = store.getDocument(1);
+    REQUIRE(retrieved != nullptr);
+    REQUIRE(retrieved->name() == "test.txt");
+    REQUIRE(retrieved->text() == "hello world");
 }
 
-TEST_CASE("Document: конструктор по умолчанию", "[Document]")
+TEST_CASE("IndexStore: addDocument возвращает ошибку при дубликате id", "[IndexStore]")
 {
-    Document doc;
+    IndexStore store;
+    Document doc1(1, "first.txt", "content");
+    Document doc2(1, "second.txt", "other");
 
-    REQUIRE(doc.id() == 0);
-    REQUIRE(doc.name().empty());
-    REQUIRE(doc.text().empty());
+    REQUIRE(store.addDocument(std::move(doc1)).has_value());
+    auto result = store.addDocument(std::move(doc2));
+    REQUIRE(!result.has_value());
+    REQUIRE(result.error() == ErrorCode::kDuplicateDocumentId);
 }
 
-TEST_CASE("DocumentBuilder: build создаёт документ", "[DocumentBuilder]")
+TEST_CASE("IndexStore: removeDocument успешно удаляет документ", "[IndexStore]")
 {
-    Document doc = DocumentBuilder::build("myfile.txt", "Hello world");
+    IndexStore store;
+    Document doc(1, "test.txt", "hello");
+    store.addDocument(std::move(doc));
 
-    CHECK(doc.name() == "myfile.txt");
-    CHECK(doc.text() == "Hello world");
+    auto result = store.removeDocument(1);
+    REQUIRE(result.has_value());
+    REQUIRE(store.getDocument(1) == nullptr);
 }
 
-TEST_CASE("DocumentBuilder: splitWords разбивает текст на слова", "[DocumentBuilder]")
+TEST_CASE("IndexStore: removeDocument возвращает ошибку, если документ не найден", "[IndexStore]")
 {
-    SECTION("Обычный текст")
-    {
-        string text = "hello world from index";
-        auto words = DocumentBuilder::splitWords(text);
-
-        REQUIRE(words.size() == 4);
-        CHECK(words[0] == "hello");
-        CHECK(words[1] == "world");
-        CHECK(words[2] == "from");
-        CHECK(words[3] == "index");
-    }
-
-    SECTION("Несколько пробелов между словами")
-    {
-        string text = "hello    world     index";
-        auto words = DocumentBuilder::splitWords(text);
-
-        REQUIRE(words.size() == 3);
-        CHECK(words[0] == "hello");
-        CHECK(words[1] == "world");
-        CHECK(words[2] == "index");
-    }
-
-    SECTION("Табуляция и переносы строк")
-    {
-        string text = "hello\nworld\tfrom\rindex";
-        auto words = DocumentBuilder::splitWords(text);
-
-        REQUIRE(words.size() == 4);
-    }
-
-    SECTION("Пустая строка")
-    {
-        string text = "";
-        auto words = DocumentBuilder::splitWords(text);
-
-        REQUIRE(words.empty());
-    }
-
-    SECTION("Только пробелы")
-    {
-        string text = "   \n\t   ";
-        auto words = DocumentBuilder::splitWords(text);
-
-        REQUIRE(words.empty());
-    }
-
-    SECTION("Слово с цифрами и знаками")
-    {
-        string text = "hello123 world_42 test!";
-        auto words = DocumentBuilder::splitWords(text);
-
-        REQUIRE(words.size() == 3);
-        CHECK(words[0] == "hello123");
-        CHECK(words[1] == "world_42");
-        CHECK(words[2] == "test!");
-    }
+    IndexStore store;
+    auto result = store.removeDocument(999);
+    REQUIRE(!result.has_value());
+    REQUIRE(result.error() == ErrorCode::kDocumentNotFound);
 }
 
-TEST_CASE("DocumentBuilder: toLower приводит к нижнему регистру", "[DocumentBuilder]")
+TEST_CASE("IndexStore: search находит слова и возвращает корректные вхождения", "[IndexStore]")
 {
-    SECTION("Английские буквы")
-    {
-        string word = "HelloWorld";
-        DocumentBuilder::toLower(word);
-        CHECK(word == "helloworld");
-    }
+    IndexStore store;
+    Document doc(1, "doc.txt", "hello world hello");
+    store.addDocument(std::move(doc));
 
-    SECTION("Смешанный регистр")
-    {
-        string word = "HeLlO WoRlD";
-        DocumentBuilder::toLower(word);
-        CHECK(word == "hello world");
-    }
-
-    SECTION("Уже нижний регистр")
-    {
-        string word = "hello";
-        DocumentBuilder::toLower(word);
-        CHECK(word == "hello");
-    }
-
-    SECTION("Цифры и знаки не меняются")
-    {
-        string word = "Hello123!";
-        DocumentBuilder::toLower(word);
-        CHECK(word == "hello123!");
-    }
+    auto result = store.search("hello");
+    REQUIRE(result.has_value());
+    REQUIRE(result->size() == 1);
+    REQUIRE((*result)[0].first == 1);
+    REQUIRE((*result)[0].second == 2);
 }
 
-TEST_CASE("InvertedIndex: добавление одного документа", "[InvertedIndex]")
+TEST_CASE("IndexStore: search возвращает пустой результат, если слово отсутствует", "[IndexStore]")
 {
-    InvertedIndex index;
-    Document doc(1, "doc1.txt", "hello world");
-    index.addDocument(std::move(doc));
-
-    SECTION("Поиск существующего слова")
-    {
-        auto result = index.search("hello");
-        REQUIRE(result.size() == 1);
-        CHECK(result[0].first == 1);
-        CHECK(result[0].second == 1);
-    }
-
-    SECTION("Поиск другого существующего слова")
-    {
-        auto result = index.search("world");
-        REQUIRE(result.size() == 1);
-        CHECK(result[0].first == 1);
-        CHECK(result[0].second == 1);
-    }
-
-    SECTION("Поиск несуществующего слова")
-    {
-        auto result = index.search("nonexistent");
-        REQUIRE(result.empty());
-    }
-}
-
-TEST_CASE("InvertedIndex: подсчёт частоты слов", "[InvertedIndex]")
-{
-    InvertedIndex index;
-    Document doc(1, "doc1.txt", "hello hello world hello");
-    index.addDocument(std::move(doc));
-
-    auto result = index.search("hello");
-    REQUIRE(result.size() == 1);
-    CHECK(result[0].second == 3);
-
-    auto result2 = index.search("world");
-    REQUIRE(result2.size() == 1);
-    CHECK(result2[0].second == 1);
-}
-
-TEST_CASE("InvertedIndex: несколько документов", "[InvertedIndex]")
-{
-    InvertedIndex index;
-
-    Document doc1(1, "file1.txt", "hello world");
-    Document doc2(2, "file2.txt", "hello index");
-    Document doc3(3, "file3.txt", "world index");
-
-    index.addDocument(std::move(doc1));
-    index.addDocument(std::move(doc2));
-    index.addDocument(std::move(doc3));
-
-    SECTION("Поиск 'hello' - должно быть в 2 документах")
-    {
-        auto result = index.search("hello");
-        REQUIRE(result.size() == 2);
-
-        bool hasDoc1 = false, hasDoc2 = false;
-        for (const auto& [id, count] : result)
-        {
-            if (id == 1)
-            {
-                hasDoc1 = true;
-                CHECK(count == 1);
-            }
-            if (id == 2)
-            {
-                hasDoc2 = true;
-                CHECK(count == 1);
-            }
-        }
-        CHECK(hasDoc1);
-        CHECK(hasDoc2);
-    }
-
-    SECTION("Поиск 'world' - должно быть в 2 документах (1 и 3)")
-    {
-        auto result = index.search("world");
-        REQUIRE(result.size() == 2);
-    }
-
-    SECTION("Поиск 'index' - должно быть в 2 документах (2 и 3)")
-    {
-        auto result = index.search("index");
-        REQUIRE(result.size() == 2);
-    }
-}
-
-TEST_CASE("InvertedIndex: регистронезависимость", "[InvertedIndex]")
-{
-    InvertedIndex index;
-    Document doc(1, "doc.txt", "Hello WORLD hello");
-    index.addDocument(std::move(doc));
-
-    auto result1 = index.search("hello");
-    REQUIRE(result1.size() == 1);
-    CHECK(result1[0].second == 2);
-
-    auto result2 = index.search("WORLD");
-    REQUIRE(result2.size() == 1);
-    CHECK(result2[0].second == 1);
-
-    auto result3 = index.search("HeLlO");
-    REQUIRE(result3.size() == 1);
-}
-
-TEST_CASE("InvertedIndex: удаление документа", "[InvertedIndex]")
-{
-    InvertedIndex index;
-
-    Document doc1(1, "file1.txt", "hello world");
-    Document doc2(2, "file2.txt", "hello index");
-
-    index.addDocument(std::move(doc1));
-    index.addDocument(std::move(doc2));
-
-    CHECK(index.search("hello").size() == 2);
-
-    index.removeDocument(1);
-
-    auto result = index.search("hello");
-    REQUIRE(result.size() == 1);
-    CHECK(result[0].first == 2);
-
-    CHECK(index.search("world").empty());
-}
-
-TEST_CASE("InvertedIndex: удаление несуществующего документа", "[InvertedIndex]")
-{
-    InvertedIndex index;
+    IndexStore store;
     Document doc(1, "doc.txt", "hello world");
-    index.addDocument(std::move(doc));
+    store.addDocument(std::move(doc));
 
-    index.removeDocument(999);
-
-    auto result = index.search("hello");
-    REQUIRE(result.size() == 1);
-    CHECK(result[0].first == 1);
+    auto result = store.search("missing");
+    REQUIRE(result.has_value());
+    REQUIRE(result->empty());
 }
 
-TEST_CASE("InvertedIndex: getDocument возвращает документ", "[InvertedIndex]")
+TEST_CASE("IndexStore: search возвращает ошибку на пустое слово", "[IndexStore]")
 {
-    InvertedIndex index;
-    Document doc(42, "mydoc.txt", "some content");
-    index.addDocument(std::move(doc));
+    IndexStore store;
+    auto result = store.search("");
+    REQUIRE(!result.has_value());
+    REQUIRE(result.error() == ErrorCode::kEmptyWord);
+}
 
-    SECTION("Существующий документ")
+TEST_CASE("IndexStore: getDocument возвращает nullptr для несуществующего id", "[IndexStore]")
+{
+    IndexStore store;
+    REQUIRE(store.getDocument(42) == nullptr);
+}
+
+TEST_CASE("UpdateTransaction: успешный commit применяет изменения", "[Transaction]")
+{
+    IndexStore store;
+
+    auto transResult = store.beginTransaction();
+    REQUIRE(transResult.has_value());
+    auto& trans = *transResult;
+
+    Document doc(1, "test.txt", "transaction content");
+    REQUIRE(trans.addDocument(std::move(doc)).has_value());
+
+    REQUIRE(store.getDocument(1) == nullptr);
+    REQUIRE(store.search("transaction").value().empty());
+
+    auto commitResult = trans.commit();
+    REQUIRE(commitResult.has_value());
+
+    const Document* retrieved = store.getDocument(1);
+    REQUIRE(retrieved != nullptr);
+    REQUIRE(retrieved->text() == "transaction content");
+
+    auto searchResult = store.search("transaction");
+    REQUIRE(searchResult.has_value());
+    REQUIRE(searchResult->size() == 1);
+}
+
+TEST_CASE("UpdateTransaction: автоматический откат при разрушении без commit", "[Transaction]")
+{
+    IndexStore store;
+
     {
-        const Document* retrieved = index.getDocument(42);
-        REQUIRE(retrieved != nullptr);
-        CHECK(retrieved->name() == "mydoc.txt");
-        CHECK(retrieved->text() == "some content");
+        auto transResult = store.beginTransaction();
+        REQUIRE(transResult.has_value());
+        auto& trans = *transResult;
+
+        Document doc(1, "temp.txt", "temporary");
+        trans.addDocument(std::move(doc));
     }
 
-    SECTION("Несуществующий документ")
-    {
-        const Document* retrieved = index.getDocument(999);
-        CHECK(retrieved == nullptr);
-    }
+    REQUIRE(store.getDocument(1) == nullptr);
+    REQUIRE(store.search("temporary").value().empty());
 }
 
-TEST_CASE("InvertedIndex: несколько одинаковых слов в документе", "[InvertedIndex]")
+TEST_CASE("UpdateTransaction: операции внутри транзакции не видны снаружи до commit", "[Transaction]")
 {
-    InvertedIndex index;
-    Document doc(1, "doc.txt", "apple apple apple banana apple");
-    index.addDocument(std::move(doc));
+    IndexStore store;
+    Document original(1, "original.txt", "original text");
+    store.addDocument(std::move(original));
 
-    auto result = index.search("apple");
-    REQUIRE(result.size() == 1);
-    CHECK(result[0].second == 4); // 4 вхождения
+    auto transResult = store.beginTransaction();
+    REQUIRE(transResult.has_value());
+    auto& trans = *transResult;
 
-    auto result2 = index.search("banana");
-    REQUIRE(result2.size() == 1);
-    CHECK(result2[0].second == 1);
+    REQUIRE(trans.removeDocument(1).has_value());
+
+    REQUIRE(store.getDocument(1) != nullptr);
+
+    Document doc2(2, "new.txt", "new content");
+    REQUIRE(trans.addDocument(std::move(doc2)).has_value());
+
+    REQUIRE(store.getDocument(2) == nullptr);
+
+    REQUIRE(trans.commit().has_value());
+
+    REQUIRE(store.getDocument(1) == nullptr);
+    REQUIRE(store.getDocument(2) != nullptr);
 }
 
-TEST_CASE("InvertedIndex: пустой документ", "[InvertedIndex]")
+TEST_CASE("UpdateTransaction: ошибки внутри транзакции не портят основной индекс", "[Transaction]")
 {
-    InvertedIndex index;
-    Document doc(1, "empty.txt", "");
-    index.addDocument(std::move(doc));
+    IndexStore store;
+    Document original(1, "keep.txt", "important");
+    store.addDocument(std::move(original));
 
-    CHECK(index.search("anything").empty());
+    auto transResult = store.beginTransaction();
+    REQUIRE(transResult.has_value());
+    auto& trans = *transResult;
 
-    CHECK(index.getDocument(1) != nullptr);
+    Document duplicate(1, "duplicate.txt", "bad");
+    auto addResult = trans.addDocument(std::move(duplicate));
+    REQUIRE(!addResult.has_value());
+    REQUIRE(addResult.error() == ErrorCode::kDuplicateDocumentId);
+
+    auto searchInTrans = trans.search("bad");
+    REQUIRE(searchInTrans.has_value());
+    REQUIRE(searchInTrans->empty());
+
+    REQUIRE(trans.commit().has_value());
+
+    REQUIRE(store.getDocument(1) != nullptr);
+    REQUIRE(store.getDocument(1)->text() == "important");
 }
 
-TEST_CASE("InvertedIndex: документы с одинаковыми ID не должны конфликтовать", "[InvertedIndex]")
+TEST_CASE("UpdateTransaction: поиск внутри транзакции работает на снимке", "[Transaction]")
 {
-    InvertedIndex index;
+    IndexStore store;
+    Document doc1(1, "one.txt", "apple banana");
+    Document doc2(2, "two.txt", "apple cherry");
+    store.addDocument(std::move(doc1));
+    store.addDocument(std::move(doc2));
 
-    Document doc1(1, "first.txt", "hello world");
-    Document doc2(1, "second.txt", "goodbye world");
+    auto transResult = store.beginTransaction();
+    REQUIRE(transResult.has_value());
+    auto& trans = *transResult;
 
-    index.addDocument(std::move(doc1));
-    index.addDocument(std::move(doc2));
+    REQUIRE(trans.removeDocument(2).has_value());
 
-    CHECK(index.search("goodbye").size() == 1);
-    CHECK(index.search("hello").empty());
+    auto searchResult = trans.search("apple");
+    REQUIRE(searchResult.has_value());
+    REQUIRE(searchResult->size() == 1);
+    REQUIRE((*searchResult)[0].first == 1);
 
-    const Document* doc = index.getDocument(1);
-    REQUIRE(doc != nullptr);
-    CHECK(doc->name() == "second.txt");
+    auto outsideSearch = store.search("apple");
+    REQUIRE(outsideSearch.has_value());
+    REQUIRE(outsideSearch->size() == 2);
+}
+
+TEST_CASE("UpdateTransaction: повторный commit невозможен", "[Transaction]")
+{
+    IndexStore store;
+    auto transResult = store.beginTransaction();
+    REQUIRE(transResult.has_value());
+    auto& trans = *transResult;
+
+    REQUIRE(trans.commit().has_value());
+    auto secondCommit = trans.commit();
+    REQUIRE(!secondCommit.has_value());
+    REQUIRE(secondCommit.error() == ErrorCode::kTransactionInactive);
+}
+
+TEST_CASE("UpdateTransaction: операции после commit возвращают ошибку", "[Transaction]")
+{
+    IndexStore store;
+    auto transResult = store.beginTransaction();
+    REQUIRE(transResult.has_value());
+    auto& trans = *transResult;
+
+    REQUIRE(trans.commit().has_value());
+
+    Document doc(1, "late.txt", "too late");
+    auto addResult = trans.addDocument(std::move(doc));
+    REQUIRE(!addResult.has_value());
+    REQUIRE(addResult.error() == ErrorCode::kTransactionInactive);
+
+    auto removeResult = trans.removeDocument(1);
+    REQUIRE(!removeResult.has_value());
+
+    auto searchResult = trans.search("anything");
+    REQUIRE(!searchResult.has_value());
+}
+
+TEST_CASE("UpdateTransaction: перемещение транзакции работает корректно", "[Transaction]")
+{
+    IndexStore store;
+    auto transResult = store.beginTransaction();
+    REQUIRE(transResult.has_value());
+
+    UpdateTransaction movedTrans = std::move(*transResult);
+
+    Document doc(1, "moved.txt", "content");
+    REQUIRE(movedTrans.addDocument(std::move(doc)).has_value());
+    REQUIRE(movedTrans.commit().has_value());
+
+    REQUIRE(store.getDocument(1) != nullptr);
+}
+
+TEST_CASE("IndexStore: beginTransaction создаёт копию состояния", "[Transaction]")
+{
+    IndexStore store;
+    Document doc(1, "original.txt", "data");
+    store.addDocument(std::move(doc));
+
+    auto transResult = store.beginTransaction();
+    REQUIRE(transResult.has_value());
+
+    Document doc2(2, "new.txt", "new");
+    store.addDocument(std::move(doc2));
+
+    auto& trans = *transResult;
+    auto searchResult = trans.search("data");
+    REQUIRE(searchResult.has_value());
+    REQUIRE(searchResult->size() == 1);
+
+    auto searchNew = trans.search("new");
+    REQUIRE(searchNew.has_value());
+    REQUIRE(searchNew->empty());
+
+    REQUIRE(trans.commit().has_value());
+    REQUIRE(store.getDocument(2) == nullptr);
+    REQUIRE(store.getDocument(1) != nullptr);
 }
