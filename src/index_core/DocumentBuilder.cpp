@@ -4,8 +4,8 @@
 static bool isDelimiter(char c)
 {
     return std::isspace(static_cast<unsigned char>(c)) || c == ',' || c == '.' || c == '!' || c == '?' || c == ';' ||
-           c == ':' || c == '-' || c == '_' || c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}' ||
-           c == '<' || c == '>' || c == '"' || c == '\'' || c == '/' || c == '\\';
+           c == ':' || c == '-' || c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}' || c == '<' ||
+           c == '>' || c == '"' || c == '\'' || c == '/' || c == '\\';
 }
 
 std::vector<std::string_view> DocumentBuilder::splitWords(std::string_view text)
