@@ -4,7 +4,7 @@
 
 using namespace std;
 
-// ==================== Тесты для IndexStore ====================
+
 
 TEST_CASE("IndexStore: addDocument успешно добавляет документ", "[IndexStore]")
 {
